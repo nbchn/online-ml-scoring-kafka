@@ -3,9 +3,11 @@
 ## Usage: 
 
 ```
-from generic_online_ml_scoring.builder import Builder
-builder = Builder(config_path, model, preprocessing, postprocessing)
-builder.start()
+from generic_online_ml_scoring.builder import ConsumerTransformerProducerLoop
+
+loop = ConsumerTransformerProducerLoop(config_path)
+loop.submit_model(model)
+loop.start()
 ```
 
 ### Parameters
@@ -20,13 +22,9 @@ config_path:
         - in.topic
         - out.topic
 model:
-    Python object that implements a '.predict(pd.Dataframe)' method.
-preprocessing:
-    Function executed before applying prediction function. 
-    Takes raw data from topic as input and should return a pd.Dataframe.
-postprocessing:
-    Function executed after applying prediction function. 
-    Takes output of prediction function as input and should return proper object to be published to out.topic.
+    Instance of class that inherits from GenericModel. GenericModel has two methods: 
+        - Contructor 
+        - Execute function that takes raw data as input and returns an iterator over results.
 ```
 
 ## Example: 
@@ -43,28 +41,28 @@ out.topic=output-topic
 
 Code:
 ```
-from generic_online_ml_scoring.builder import Builder
-import pandas as pd
-import pickle
-
-def preprocessing(json):
-    return pd.DataFrame(data=json, index=[0])
+from generic_online_ml_scoring.builder import ConsumerTransformerProducerLoop
+from generic_online_ml_scoring.builder import GenericModel
+import math
 
 
-def postprocessing(df):
-    return df.to_dict('records')[0]
+class SquareAllIntPropsModel(GenericModel):
+    def __init__(self):
+        print("Initialization of the model")
 
-fh = open(data/model1.pkl, 'rb')
-model1 = pickle.load(fh)
+    def execute(self, data):
+        for key in data:
+            yield {
+                "key": key,
+                "value": math.pow(int(data[key]), 2)
+            }
 
-builder = Builder(
-    'data/model1.conf', 
-    model1, 
-    preproc_func, 
-    postproc_func
-)
 
-builder.start()
+config_path = "../data/testconfig.conf"
+
+loop = ConsumerTransformerProducerLoop(config_path)
+loop.submit_model(SquareAllIntPropsModel())
+loop.start()
 
 ```
 
